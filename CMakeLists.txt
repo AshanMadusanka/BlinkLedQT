@@ -16,9 +16,7 @@ add_executable(BlinkLed
   main.cpp
 )
 target_link_libraries(BlinkLed Qt${QT_VERSION_MAJOR}::Core)
-target_link_libraries(BlinkLed
-    Qt6::Core
-)
+
 # set_target_properties(BlinkLed PROPERTIES
 #     INSTALL_RPATH "/usr/local/qt6/lib"
 #     BUILD_WITH_INSTALL_RPATH TRUE

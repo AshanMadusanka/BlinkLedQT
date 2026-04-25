@@ -1,0 +1,43 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        
+        {
+            "name": "Remote Debug on Raspberry Pi",
+            "type": "cppdbg",
+            "request": "launch",
+
+            "program": "${workspaceFolder}/build/vscode-rpi-debug/${config:APP_NAME}",
+
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${config:TARGET_FOLDER}",
+
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb-multiarch",
+            "miDebuggerServerAddress": "${config:TARGET_DEVICE}:${config:DEBUG_PORT}",
+
+            "preLaunchTask": "Start GDB Server",
+
+            "setupCommands": [
+                {
+                    "description": "Set sysroot",
+                    "text": "-gdb-set sysroot ${config:SYS_ROOT}"
+                },
+                {
+                    "description": "Enable shared library loading",
+                    "text": "-interpreter-exec console \"set auto-solib-add on\""
+                },
+                {
+                    "description": "Set library search path",
+                    "text": "-gdb-set solib-search-path ${config:SYS_ROOT}/usr/local/qt6/lib:${workspaceFolder}/build/vscode-rpi-debug"
+                },
+                {
+                    "description": "Enable pretty printing",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}

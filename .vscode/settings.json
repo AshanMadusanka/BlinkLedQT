@@ -1,0 +1,26 @@
+{
+    "APP_NAME": "BlinkLed",
+
+    "TARGET_DEVICE": "hydronect@10.51.234.235",
+
+    "TARGET_FOLDER": "/home/hydronect/qt-apps/BlinkLed/bin",
+
+    "TARGET_QT_LIB_FOLDER": "/usr/local/qt6/lib",
+
+    "DEBUG_PORT": "12345",
+
+    "SYS_ROOT": "/home/ashan/rpi-sysroot",
+
+    "RSYNC_FILES": "${workspaceFolder}/build/vscode-rpi-debug/BlinkLed",
+
+    "CMD_LINE_ARGUMENTS": "",
+
+    "cmake.buildDirectory": "${workspaceFolder}/build/vscode-rpi-debug",
+    "cmake.configureSettings": {
+        "CMAKE_TOOLCHAIN_FILE": "/home/ashan/qt6-rpi/pi/lib/cmake/Qt6/qt.toolchain.cmake",
+        "CMAKE_PREFIX_PATH": "/home/ashan/qt6-rpi/pi",
+        "CMAKE_INSTALL_PREFIX": "/home/hydronect/qt-apps/BlinkLed",
+        "CMAKE_BUILD_TYPE": "Debug"
+    },
+    "cmake.generator": "Ninja"
+}

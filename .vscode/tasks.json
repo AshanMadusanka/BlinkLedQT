@@ -1,0 +1,68 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Configure",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "-S",
+                "${workspaceFolder}",
+                "-B",
+                "${workspaceFolder}/build/vscode-rpi-debug",
+                "-G",
+                "Ninja",
+                "-DCMAKE_TOOLCHAIN_FILE=/home/ashan/qt6-rpi/pi/lib/cmake/Qt6/qt.toolchain.cmake",
+                "-DCMAKE_PREFIX_PATH=/home/ashan/qt6-rpi/pi",
+                "-DCMAKE_INSTALL_PREFIX=/home/hydronect/qt-apps/BlinkLed",
+                "-DCMAKE_BUILD_TYPE=Debug"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Build",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/build/vscode-rpi-debug"
+            ],
+            "dependsOn": "Configure",
+            "group": "build",
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "Deploy to Raspberry Pi",
+            "type": "shell",
+            "command": "ssh hydronect@10.51.234.235 \"mkdir -p /home/hydronect/qt-apps/BlinkLed/bin\" && rsync -avz --progress ${workspaceFolder}/build/vscode-rpi-debug/BlinkLed hydronect@10.51.234.235:/home/hydronect/qt-apps/BlinkLed/bin/",
+            "dependsOn": "Build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Run on Raspberry Pi",
+            "type": "shell",
+            "command": "ssh hydronect@10.51.234.235 \"cd /home/hydronect/qt-apps/BlinkLed/bin && chmod +x BlinkLed && DISPLAY=:0 LD_LIBRARY_PATH=/usr/local/qt6/lib:\\$LD_LIBRARY_PATH ./BlinkLed\"",
+            "dependsOn": "Deploy to Raspberry Pi",
+            "problemMatcher": []
+        },
+        {
+            "label": "Start GDB Server",
+            "type": "shell",
+            "command": "ssh hydronect@10.51.234.235 \"pkill -f 'gdbserver.*BlinkLed' || true; cd /home/hydronect/qt-apps/BlinkLed/bin && chmod +x BlinkLed && DISPLAY=:0 LD_LIBRARY_PATH=/usr/local/qt6/lib:\\$LD_LIBRARY_PATH gdbserver :12345 ./BlinkLed ${config:CMD_LINE_ARGUMENTS}\"",
+            "dependsOn": "Deploy to Raspberry Pi",
+            "isBackground": true,
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^(.*)$",
+                    "message": 1
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": ".",
+                    "endsPattern": "Listening on port 12345"
+                }
+            }
+        }
+    ]
+}
+
