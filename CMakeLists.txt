@@ -17,8 +17,13 @@ add_executable(BlinkLed
   main.cpp
   mcp23017_rpi/mcp23017_rpi.c
   mcp23017_rpi/mcp23017_rpi.h
+  modbus_rs485_rpi/modbus_rs485_rpi.c
+  modbus_rs485_rpi/modbus_rs485_rpi.h
+  cwt_sl_lth_rpi/cwt_sl_lth_rpi.c
+  cwt_sl_lth_rpi/cwt_sl_lth_rpi.h
 )
 target_include_directories(BlinkLed PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/mcp23017_rpi
 )
 target_link_libraries(BlinkLed Qt${QT_VERSION_MAJOR}::Core Threads::Threads)
