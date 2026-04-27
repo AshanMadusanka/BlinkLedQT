@@ -13,6 +13,24 @@
 
 static volatile sig_atomic_t keepRunning = 1;
 
+modbus_rs485_rpi_bus_t bus = {};
+cwt_sl_lth_rpi_handle_t sensor = nullptr;
+
+static void read_cwt_sl_lth_temp_humidity(cwt_sl_lth_rpi_handle_t sensor);
+class SensorThread : public QThread
+{
+protected:
+    void run() override
+    {
+        while (true)
+        {
+            qDebug() << "Reading sensor...";
+            read_cwt_sl_lth_temp_humidity(sensor);
+            QThread::sleep(5); // Sleep for 5 seconds
+        }
+    }
+};
+
 static void handleSignal(int signalNumber)
 {
     Q_UNUSED(signalNumber);
@@ -54,12 +72,10 @@ static bool writeLed(mcp23017_rpi_t *device,
     return true;
 }
 
-static void test_cwt_sl_lth_temp_humidity(void)
+static bool init_cwt_sl_lth_sensor(modbus_rs485_rpi_bus_t *bus,
+                                   cwt_sl_lth_rpi_handle_t *sensor)
 {
-    qInfo() << "Testing CWT-SL-LTH temperature/humidity on /dev/serial0";
-
-    modbus_rs485_rpi_bus_t bus = {};
-    int err = modbus_rs485_rpi_open(&bus, "/dev/serial0", 4800);
+    int err = modbus_rs485_rpi_open(bus, "/dev/serial0", 4800);
     if (err != MODBUS_RS485_RPI_OK) {
         const int openErrno = errno;
         std::printf("Failed to open RS485 bus on /dev/serial0, error %d, errno %d (%s)\n",
@@ -67,54 +83,66 @@ static void test_cwt_sl_lth_temp_humidity(void)
                     openErrno,
                     std::strerror(openErrno));
         std::fflush(stdout);
-        return;
+        return false;
     }
 
     cwt_sl_lth_rpi_config_t config = {};
-    config.bus = &bus;
+    config.bus = bus;
     config.slave_id = 1;
     config.lux_mode = CWT_SL_LTH_RPI_LUX_SIMPLE_1X;
 
-    cwt_sl_lth_rpi_handle_t sensor = nullptr;
-    err = cwt_sl_lth_rpi_create(&config, &sensor);
+    err = cwt_sl_lth_rpi_create(&config, sensor);
     if (err != CWT_SL_LTH_RPI_OK) {
         std::printf("Failed to create CWT-SL-LTH sensor handle, error %d\n", err);
         std::fflush(stdout);
-        modbus_rs485_rpi_close(&bus);
-        return;
+        modbus_rs485_rpi_close(bus);
+        return false;
     }
 
+    return true;
+}
+
+static void read_cwt_sl_lth_temp_humidity(cwt_sl_lth_rpi_handle_t sensor)
+{
     float temperature = 0.0f;
     float humidity = 0.0f;
 
-    err = cwt_sl_lth_rpi_read_temp_hum(sensor, &temperature, &humidity);
+    const int err = cwt_sl_lth_rpi_read_temp_hum(sensor, &temperature, &humidity);
     if (err == CWT_SL_LTH_RPI_OK) {
         std::printf("CWT-SL-LTH Temperature: %.1f C\n", temperature);
         std::printf("CWT-SL-LTH Humidity: %.1f %%\n", humidity);
     } else {
         std::printf("Failed to read CWT-SL-LTH temperature/humidity, error %d\n", err);
-
-        uint8_t resp[9] = {};
-        const int modbusErr = modbus_rs485_rpi_read_holding(&bus,
-                                                            1,
-                                                            0x0000,
-                                                            2,
-                                                            resp,
-                                                            sizeof(resp),
-                                                            2000);
-        std::printf("Direct Modbus temp/humidity read error %d\n", modbusErr);
     }
-    std::fflush(stdout);
 
-    cwt_sl_lth_rpi_destroy(sensor);
-    modbus_rs485_rpi_close(&bus);
+    std::fflush(stdout);
 }
+
+// static void test_cwt_sl_lth_temp_humidity(void)
+// {
+//     qInfo() << "Testing CWT-SL-LTH temperature/humidity on /dev/serial0";
+
+
+
+
+
+    
+
+//     cwt_sl_lth_rpi_destroy(sensor);
+//     modbus_rs485_rpi_close(&bus);
+// }
 
 int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
 
-    test_cwt_sl_lth_temp_humidity();
+    if (!init_cwt_sl_lth_sensor(&bus, &sensor)) {
+        return 1;
+    }
+
+    SensorThread *sensor = new SensorThread();
+    sensor->start();
+    
 
     constexpr const char *i2cDevice = MCP23017_RPI_DEFAULT_I2C_DEV;
     constexpr quint8 expander1Address = 0x22;
