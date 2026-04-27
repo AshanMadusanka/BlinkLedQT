@@ -1,7 +1,7 @@
 {
     "APP_NAME": "BlinkLed",
 
-    "TARGET_DEVICE": "hydronect@10.51.234.235",
+    "TARGET_DEVICE": "hydronect@192.168.8.104",
 
     "TARGET_FOLDER": "/home/hydronect/qt-apps/BlinkLed/bin",
 

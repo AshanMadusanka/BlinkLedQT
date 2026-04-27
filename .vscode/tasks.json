@@ -34,21 +34,21 @@
         {
             "label": "Deploy to Raspberry Pi",
             "type": "shell",
-            "command": "ssh hydronect@10.51.234.235 \"mkdir -p /home/hydronect/qt-apps/BlinkLed/bin\" && rsync -avz --progress ${workspaceFolder}/build/vscode-rpi-debug/BlinkLed hydronect@10.51.234.235:/home/hydronect/qt-apps/BlinkLed/bin/",
+            "command": "ssh hydronect@192.168.8.104 \"mkdir -p /home/hydronect/qt-apps/BlinkLed/bin\" && rsync -avz --progress ${workspaceFolder}/build/vscode-rpi-debug/BlinkLed hydronect@192.168.8.104:/home/hydronect/qt-apps/BlinkLed/bin/",
             "dependsOn": "Build",
             "problemMatcher": []
         },
         {
             "label": "Run on Raspberry Pi",
             "type": "shell",
-            "command": "ssh hydronect@10.51.234.235 \"cd /home/hydronect/qt-apps/BlinkLed/bin && chmod +x BlinkLed && DISPLAY=:0 LD_LIBRARY_PATH=/usr/local/qt6/lib:\\$LD_LIBRARY_PATH ./BlinkLed\"",
+            "command": "ssh hydronect@192.168.8.104 \"cd /home/hydronect/qt-apps/BlinkLed/bin && chmod +x BlinkLed && DISPLAY=:0 LD_LIBRARY_PATH=/usr/local/qt6/lib:\\$LD_LIBRARY_PATH ./BlinkLed\"",
             "dependsOn": "Deploy to Raspberry Pi",
             "problemMatcher": []
         },
         {
             "label": "Start GDB Server",
             "type": "shell",
-            "command": "ssh hydronect@10.51.234.235 \"pkill -f 'gdbserver.*BlinkLed' || true; cd /home/hydronect/qt-apps/BlinkLed/bin && chmod +x BlinkLed && DISPLAY=:0 LD_LIBRARY_PATH=/usr/local/qt6/lib:\\$LD_LIBRARY_PATH gdbserver :12345 ./BlinkLed ${config:CMD_LINE_ARGUMENTS}\"",
+            "command": "ssh hydronect@192.168.8.104 \"pkill -f 'gdbserver.*BlinkLed' || true; cd /home/hydronect/qt-apps/BlinkLed/bin && chmod +x BlinkLed && DISPLAY=:0 LD_LIBRARY_PATH=/usr/local/qt6/lib:\\$LD_LIBRARY_PATH gdbserver :12345 ./BlinkLed ${config:CMD_LINE_ARGUMENTS}\"",
             "dependsOn": "Deploy to Raspberry Pi",
             "isBackground": true,
             "problemMatcher": {
