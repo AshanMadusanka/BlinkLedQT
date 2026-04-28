@@ -12,6 +12,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core)
 find_package(Threads REQUIRED)
+find_library(GPIOD_LIBRARY NAMES gpiod REQUIRED)
 
 add_executable(BlinkLed
   main.cpp
@@ -26,7 +27,7 @@ target_include_directories(BlinkLed PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/mcp23017_rpi
 )
-target_link_libraries(BlinkLed Qt${QT_VERSION_MAJOR}::Core Threads::Threads)
+target_link_libraries(BlinkLed Qt${QT_VERSION_MAJOR}::Core Threads::Threads ${GPIOD_LIBRARY})
 
 # set_target_properties(BlinkLed PROPERTIES
 #     INSTALL_RPATH "/usr/local/qt6/lib"
