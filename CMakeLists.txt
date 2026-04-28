@@ -22,6 +22,8 @@ add_executable(BlinkLed
   modbus_rs485_rpi/modbus_rs485_rpi.h
   cwt_sl_lth_rpi/cwt_sl_lth_rpi.c
   cwt_sl_lth_rpi/cwt_sl_lth_rpi.h
+  sn3002_co2_rpi/sn3002_co2_rpi.c
+  sn3002_co2_rpi/sn3002_co2_rpi.h
 )
 target_include_directories(BlinkLed PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
