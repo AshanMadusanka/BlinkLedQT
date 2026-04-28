@@ -26,6 +26,8 @@ add_executable(BlinkLed
   sn3002_co2_rpi/sn3002_co2_rpi.h
   xl9535_rpi/xl9535_rpi.c
   xl9535_rpi/xl9535_rpi.h
+  flow_sensor_rpi/flow_sensor_rpi.c
+  flow_sensor_rpi/flow_sensor_rpi.h
 )
 target_include_directories(BlinkLed PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}

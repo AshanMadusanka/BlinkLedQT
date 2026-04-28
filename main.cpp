@@ -18,6 +18,7 @@
 #include "cwt_sl_lth_rpi/cwt_sl_lth_rpi.h"
 #include "sn3002_co2_rpi/sn3002_co2_rpi.h"
 #include "xl9535_rpi/xl9535_rpi.h"
+#include "flow_sensor_rpi/flow_sensor_rpi.h"
 
 static volatile sig_atomic_t keepRunning = 1;
 
@@ -29,6 +30,7 @@ static QMutex modbusReadMutex;
 static void read_cwt_sl_lth_temp_humidity(cwt_sl_lth_rpi_handle_t sensor);
 static void read_sn3002_co2(sn3002_co2_rpi_handle_t sensor);
 static bool cycle_xl9535_relays(xl9535_rpi_t *relayPanel);
+static void test_flow_sensor(void);
 
 class SensorThread : public QThread
 {
@@ -80,6 +82,15 @@ protected:
 
 private:
     xl9535_rpi_t *relayPanel;
+};
+
+class FlowSensorThread : public QThread
+{
+protected:
+    void run() override
+    {
+        test_flow_sensor();
+    }
 };
 
 static void handleSignal(int signalNumber)
@@ -146,26 +157,24 @@ static bool configure_xl9535_relay_panel(xl9535_rpi_t *relayPanel, quint8 addres
 
 static bool cycle_xl9535_relays(xl9535_rpi_t *relayPanel)
 {
-    for (int channel = 0; channel < 8 && keepRunning; ++channel) {
-        const uint8_t value = static_cast<uint8_t>(1u << channel);
-        const int err = xl9535_rpi_write_port(relayPanel, XL9535_RPI_PORT_0, value);
-        if (err < 0) {
-            qCritical() << "Failed to write XL9535 relay channel" << channel
-                        << "error" << err << errorText(err);
-            return false;
-        }
-
-        qInfo() << "XL9535 relay channel" << channel << "ON";
-        QThread::msleep(500);
-    }
-
-    const int err = xl9535_rpi_write_port(relayPanel, XL9535_RPI_PORT_0, 0x00);
+    int err = xl9535_rpi_write_port(relayPanel, XL9535_RPI_PORT_0, 0x01);
     if (err < 0) {
-        qCritical() << "Failed to turn XL9535 relays OFF, error" << err << errorText(err);
+        qCritical() << "Failed to turn XL9535 relay channel 0 ON, error"
+                    << err << errorText(err);
         return false;
     }
 
-    qInfo() << "XL9535 relays OFF";
+    qInfo() << "XL9535 relay channel 0 ON";
+    QThread::msleep(500);
+
+    // err = xl9535_rpi_write_port(relayPanel, XL9535_RPI_PORT_0, 0x00);
+    // if (err < 0) {
+    //     qCritical() << "Failed to turn XL9535 relay channel 0 OFF, error"
+    //                 << err << errorText(err);
+    //     return false;
+    // }
+
+    qInfo() << "XL9535 relay channel 0 OFF";
     QThread::msleep(500);
     return true;
 }
@@ -262,6 +271,66 @@ static void read_sn3002_co2(sn3002_co2_rpi_handle_t sensor)
     }
 
     std::fflush(stdout);
+}
+
+static void test_flow_sensor(void)
+{
+    constexpr int flowGpio = 17;
+    constexpr uint8_t flowSensorId = 1;
+    flow_sensor_rpi_handle_t flow = nullptr;
+    flow_sensor_rpi_config_t cfg = {};
+
+    cfg.gpio = flowGpio;
+    cfg.sensor_id = flowSensorId;
+    cfg.calibration_factor = 7.5f;
+    cfg.gpiochip = FLOW_SENSOR_RPI_DEFAULT_GPIOCHIP;
+
+    int err = flow_sensor_rpi_init(&cfg, &flow);
+    if (err != FLOW_SENSOR_RPI_OK) {
+        std::printf("Failed to init flow sensor on BCM GPIO%d, error %d\n",
+                    flowGpio,
+                    err);
+        std::fflush(stdout);
+        return;
+    }
+
+    while (keepRunning) {
+        float hz = 0.0f;
+        float lmin = 0.0f;
+        uint64_t totalPulses = 0;
+
+        sleep(1);
+
+        err = flow_sensor_rpi_get_frequency(flow, &hz);
+        if (err != FLOW_SENSOR_RPI_OK) {
+            std::printf("Failed to read flow frequency, error %d\n", err);
+            std::fflush(stdout);
+            break;
+        }
+
+        err = flow_sensor_rpi_get_flow_rate_l_min(flow, &lmin);
+        if (err != FLOW_SENSOR_RPI_OK) {
+            std::printf("Failed to read flow rate, error %d\n", err);
+            std::fflush(stdout);
+            break;
+        }
+
+        err = flow_sensor_rpi_get_total_pulses(flow, &totalPulses);
+        if (err != FLOW_SENSOR_RPI_OK) {
+            std::printf("Failed to read flow total pulses, error %d\n", err);
+            std::fflush(stdout);
+            break;
+        }
+
+        std::printf("Flow sensor %u: %.2f Hz, %.2f L/min, total pulses %llu\n",
+                    static_cast<unsigned>(flowSensorId),
+                    hz,
+                    lmin,
+                    static_cast<unsigned long long>(totalPulses));
+        std::fflush(stdout);
+    }
+
+    flow_sensor_rpi_deinit(flow);
 }
 
 
@@ -386,6 +455,7 @@ int main(int argc, char *argv[])
 
     SensorThread sensorThread;
     Co2SensorThread co2SensorThread;
+    FlowSensorThread flowSensorThread;
 
     constexpr const char *i2cDevice = MCP23017_RPI_DEFAULT_I2C_DEV;
     constexpr quint8 expander1Address = 0x22;
@@ -406,7 +476,7 @@ int main(int argc, char *argv[])
     qInfo() << "BlinkLed started";
     qInfo() << "Using MCP23017 expanders at 0x22 and 0x20 on" << i2cDevice;
     qInfo() << "Blinking GPB7 on both expanders";
-    qInfo() << "Testing XL9535 8-channel relay panel at 0x21 on" << i2cDevice;
+    qInfo() << "Testing XL9535 relay channel 0 at 0x21 on" << i2cDevice;
 
     int err = mcp23017_rpi_open(&expander1, i2cDevice, expander1Address);
     if (err < 0) {
@@ -448,6 +518,7 @@ int main(int argc, char *argv[])
     if (exitCode == 0) {
         sensorThread.start();
         co2SensorThread.start();
+        flowSensorThread.start();
         relayTestThread.start();
     }
 
@@ -499,6 +570,9 @@ int main(int argc, char *argv[])
     }
     if (co2SensorThread.isRunning()) {
         co2SensorThread.wait();
+    }
+    if (flowSensorThread.isRunning()) {
+        flowSensorThread.wait();
     }
 
     if (relayPanelOpen) {
