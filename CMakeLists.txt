@@ -24,6 +24,8 @@ add_executable(BlinkLed
   cwt_sl_lth_rpi/cwt_sl_lth_rpi.h
   sn3002_co2_rpi/sn3002_co2_rpi.c
   sn3002_co2_rpi/sn3002_co2_rpi.h
+  xl9535_rpi/xl9535_rpi.c
+  xl9535_rpi/xl9535_rpi.h
 )
 target_include_directories(BlinkLed PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}

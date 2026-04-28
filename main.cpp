@@ -17,6 +17,7 @@
 #include "modbus_rs485_rpi/modbus_rs485_rpi.h"
 #include "cwt_sl_lth_rpi/cwt_sl_lth_rpi.h"
 #include "sn3002_co2_rpi/sn3002_co2_rpi.h"
+#include "xl9535_rpi/xl9535_rpi.h"
 
 static volatile sig_atomic_t keepRunning = 1;
 
@@ -27,6 +28,7 @@ static QMutex modbusReadMutex;
 
 static void read_cwt_sl_lth_temp_humidity(cwt_sl_lth_rpi_handle_t sensor);
 static void read_sn3002_co2(sn3002_co2_rpi_handle_t sensor);
+static bool cycle_xl9535_relays(xl9535_rpi_t *relayPanel);
 
 class SensorThread : public QThread
 {
@@ -54,6 +56,30 @@ protected:
             QThread::sleep(5); // Sleep for 5 seconds
         }
     }
+};
+
+class RelayTestThread : public QThread
+{
+public:
+    explicit RelayTestThread(xl9535_rpi_t *relayPanel)
+        : relayPanel(relayPanel)
+    {
+    }
+
+protected:
+    void run() override
+    {
+        while (keepRunning)
+        {
+            if (!cycle_xl9535_relays(relayPanel)) {
+                keepRunning = 0;
+                break;
+            }
+        }
+    }
+
+private:
+    xl9535_rpi_t *relayPanel;
 };
 
 static void handleSignal(int signalNumber)
@@ -94,6 +120,53 @@ static bool writeLed(mcp23017_rpi_t *device,
         return false;
     }
 
+    return true;
+}
+
+static bool configure_xl9535_relay_panel(xl9535_rpi_t *relayPanel, quint8 address)
+{
+    int err = xl9535_rpi_write_port(relayPanel, XL9535_RPI_PORT_0, 0x00);
+    if (err < 0) {
+        qCritical() << "Failed to set all XL9535 relays OFF at"
+                    << Qt::hex << address << Qt::dec
+                    << "error" << err << errorText(err);
+        return false;
+    }
+
+    err = xl9535_rpi_write_register(relayPanel, XL9535_REGISTER_CONFIG_0, 0x00);
+    if (err < 0) {
+        qCritical() << "Failed to configure XL9535 port 0 as relay outputs at"
+                    << Qt::hex << address << Qt::dec
+                    << "error" << err << errorText(err);
+        return false;
+    }
+
+    return true;
+}
+
+static bool cycle_xl9535_relays(xl9535_rpi_t *relayPanel)
+{
+    for (int channel = 0; channel < 8 && keepRunning; ++channel) {
+        const uint8_t value = static_cast<uint8_t>(1u << channel);
+        const int err = xl9535_rpi_write_port(relayPanel, XL9535_RPI_PORT_0, value);
+        if (err < 0) {
+            qCritical() << "Failed to write XL9535 relay channel" << channel
+                        << "error" << err << errorText(err);
+            return false;
+        }
+
+        qInfo() << "XL9535 relay channel" << channel << "ON";
+        QThread::msleep(500);
+    }
+
+    const int err = xl9535_rpi_write_port(relayPanel, XL9535_RPI_PORT_0, 0x00);
+    if (err < 0) {
+        qCritical() << "Failed to turn XL9535 relays OFF, error" << err << errorText(err);
+        return false;
+    }
+
+    qInfo() << "XL9535 relays OFF";
+    QThread::msleep(500);
     return true;
 }
 
@@ -317,11 +390,14 @@ int main(int argc, char *argv[])
     constexpr const char *i2cDevice = MCP23017_RPI_DEFAULT_I2C_DEV;
     constexpr quint8 expander1Address = 0x22;
     constexpr quint8 expander2Address = 0x20;
+    constexpr quint8 relayPanelAddress = 0x21;
 
     mcp23017_rpi_t expander1;
     mcp23017_rpi_t expander2;
+    xl9535_rpi_t relayPanel;
     bool expander1Open = false;
     bool expander2Open = false;
+    bool relayPanelOpen = false;
     int exitCode = 0;
 
     std::signal(SIGINT, handleSignal);
@@ -330,6 +406,7 @@ int main(int argc, char *argv[])
     qInfo() << "BlinkLed started";
     qInfo() << "Using MCP23017 expanders at 0x22 and 0x20 on" << i2cDevice;
     qInfo() << "Blinking GPB7 on both expanders";
+    qInfo() << "Testing XL9535 8-channel relay panel at 0x21 on" << i2cDevice;
 
     int err = mcp23017_rpi_open(&expander1, i2cDevice, expander1Address);
     if (err < 0) {
@@ -348,15 +425,30 @@ int main(int argc, char *argv[])
     }
     expander2Open = true;
 
+    err = xl9535_rpi_open(&relayPanel, i2cDevice, relayPanelAddress);
+    if (err < 0) {
+        qCritical() << "Failed to open XL9535 relay panel at 0x21, error"
+                    << err << errorText(err);
+        mcp23017_rpi_close(&expander2);
+        mcp23017_rpi_close(&expander1);
+        cleanup_rs485_sensors();
+        return 1;
+    }
+    relayPanelOpen = true;
+
     if (!configureLed(&expander1, expander1Address) ||
-        !configureLed(&expander2, expander2Address)) {
+        !configureLed(&expander2, expander2Address) ||
+        !configure_xl9535_relay_panel(&relayPanel, relayPanelAddress)) {
         exitCode = 1;
         keepRunning = 0;
     }
 
+    RelayTestThread relayTestThread(&relayPanel);
+
     if (exitCode == 0) {
         sensorThread.start();
         co2SensorThread.start();
+        relayTestThread.start();
     }
 
     while (keepRunning) {
@@ -399,11 +491,19 @@ int main(int argc, char *argv[])
     }
 
     keepRunning = 0;
+    if (relayTestThread.isRunning()) {
+        relayTestThread.wait();
+    }
     if (sensorThread.isRunning()) {
         sensorThread.wait();
     }
     if (co2SensorThread.isRunning()) {
         co2SensorThread.wait();
+    }
+
+    if (relayPanelOpen) {
+        (void)xl9535_rpi_write_port(&relayPanel, XL9535_RPI_PORT_0, 0x00);
+        xl9535_rpi_close(&relayPanel);
     }
 
     cleanup_rs485_sensors();
