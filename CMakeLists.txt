@@ -28,10 +28,13 @@ add_executable(BlinkLed
   xl9535_rpi/xl9535_rpi.h
   flow_sensor_rpi/flow_sensor_rpi.c
   flow_sensor_rpi/flow_sensor_rpi.h
+  ads1115_rpi/ads1115_rpi.c
+  ads1115_rpi/ads1115_rpi.h
 )
 target_include_directories(BlinkLed PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/mcp23017_rpi
+  ${CMAKE_CURRENT_SOURCE_DIR}/ads1115_rpi
 )
 target_link_libraries(BlinkLed Qt${QT_VERSION_MAJOR}::Core Threads::Threads ${GPIOD_LIBRARY})
 
